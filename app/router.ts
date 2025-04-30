@@ -7,5 +7,8 @@ export default class Router extends EmberRouter {
 }
 
 Router.map(function () {
-  // Add route declarations here
+  this.route('calendar');
+  this.route('timer');
+  this.route('clock');
+  this.route('menu');
 });
