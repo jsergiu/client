@@ -11,4 +11,5 @@ Router.map(function () {
   this.route('timer');
   this.route('clock');
   this.route('menu');
+  this.route('assistant');
 });
