@@ -2,6 +2,47 @@
 
 {{outlet}}
 
+{{#unless this.isMenuRoute}}
+  <LinkTo @route="menu" class="home-button">
+    <span class="home-icon">⌂</span>
+  </LinkTo>
+{{/unless}}
+
 {{! The following component displays Ember's default welcome message. }}
 <div>Hi</div>
 {{! Feel free to remove this! }}
+
+<style>
+  .home-button {
+    position: fixed;
+    bottom: 3rem;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    text-decoration: none;
+    color: #333;
+    transition: all 0.3s ease;
+    z-index: 1000;
+  }
+
+  .home-button:hover {
+    transform: translateX(-50%) translateY(-4px);
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+  }
+
+  .home-icon {
+    font-size: 2.5rem;
+    line-height: 1;
+  }
+</style>
