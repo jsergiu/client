@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 from datetime import datetime
 from utils.logger import setup_logging
+from websocket.event_handler import EventWebSocketHandler
 
 logger = setup_logging()
 logger.info("Application starting")
@@ -62,6 +63,22 @@ async def websocket_endpoint(websocket: WebSocket):
                 logger.info("WebSocket connection closed")
             except Exception as e:
                 logger.error(f"Error closing WebSocket: {str(e)}")
+
+@app.websocket("/ws/events")
+async def event_websocket_endpoint(websocket: WebSocket):
+    handler = EventWebSocketHandler(websocket)
+    
+    # Register event handlers
+    @handler.on("USER_PROMPT_RESPONSE")
+    async def handle_user_prompt_response(payload):
+        logger.info(f"Received user prompt response: {payload}")
+        # Process the response and emit a confirmation
+        await handler.emit("PROMPT_RESPONSE_RECEIVED", {
+            "status": "success",
+            "message": "Response received and processed"
+        })
+    
+    await handler.handle_connection()
 
 if __name__ == "__main__":
     import uvicorn
