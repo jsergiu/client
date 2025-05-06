@@ -1,14 +1,35 @@
 import Controller from '@ember/controller';
 import { action } from '@ember/object';
 import { tracked } from '@glimmer/tracking';
+import { inject as service } from '@ember/service';
+import EventService from '../services/event-service';
 
 export default class AssistantController extends Controller {
   @tracked isRecording = false;
+  @tracked transcription: string | null = null;
   private mediaRecorder: MediaRecorder | null = null;
   private audioChunks: Blob[] = [];
   private websocket: WebSocket | null = null;
   private stream: MediaStream | null = null;
   private isClosing = false;
+
+  @service eventService!: EventService;
+
+  constructor() {
+    super(...arguments);
+    // Connect to events WebSocket
+    this.eventService.connect();
+    
+    // Listen for transcription events
+    this.eventService.on('prompt_response', (payload: { text: string }) => {
+      this.transcription = payload.text;
+    });
+  }
+
+  willDestroy() {
+    this.eventService.disconnect();
+    super.willDestroy();
+  }
 
   @action
   async toggleRecording() {
@@ -28,6 +49,7 @@ export default class AssistantController extends Controller {
       });
       this.audioChunks = [];
       this.isClosing = false;
+      this.transcription = null; // Reset transcription when starting new recording
 
       // Connect to WebSocket
       this.websocket = new WebSocket('ws://localhost:8000/ws/audio');
@@ -101,9 +123,10 @@ export default class AssistantController extends Controller {
       this.stream = null;
     }
 
-    if (this.websocket && !this.isClosing) {
+    if (this.websocket) {
       try {
         if (this.websocket.readyState === WebSocket.OPEN) {
+          console.log('Closing WebSocket connection...');
           this.websocket.close(1000, "Recording stopped");
         }
       } catch (error) {

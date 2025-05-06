@@ -4,10 +4,10 @@ import os
 from datetime import datetime
 from utils.logger import setup_logging
 from websocket.event_handler import EventWebSocketHandler
+from speech.recognition.whisper_stt import WhisperSTT
 
 logger = setup_logging()
 logger.info("Application starting")
-
 
 app = FastAPI()
 
@@ -23,17 +23,43 @@ app.add_middleware(
 # Create audio directory if it doesn't exist
 os.makedirs("audio", exist_ok=True)
 
+# Initialize WhisperSTT
+whisper_stt = WhisperSTT()
+
+# Store active event handlers
+active_event_handlers: dict[str, EventWebSocketHandler] = {}
+
+async def handle_transcription(filename: str) -> None:
+    """Handle the transcription of an audio file and send it to all connected clients."""
+    try:
+        logger.info(f"Starting transcription of file: {filename}")
+        transcription = whisper_stt.transcribe(filename)
+        if transcription:  # Check if transcription was successful
+            logger.info(f"Transcription successful: {transcription[:100]}...")
+            # Send transcription through event WebSocket
+            for handler in active_event_handlers.values():
+                await handler.emit("prompt_response", {
+                    "text": transcription
+                })
+            logger.info("Transcription sent to all connected clients")
+        else:
+            logger.error("Transcription returned None")
+    except Exception as e:
+        logger.error(f"Error transcribing audio: {str(e)}")
+
 @app.websocket("/ws/audio")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     logger.info("WebSocket connection accepted")
     audio_file = None
     is_closed = False
+    filename = None
     
     try:
         # Generate unique filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M")
         filename = f"audio/recording_{timestamp}.webm"
+        logger.info(f"Created new audio file: {filename}")
         
         # Open file for writing
         audio_file = open(filename, 'wb')
@@ -54,7 +80,17 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception as e:
         logger.error(f"Error in WebSocket handler: {str(e)}")
     finally:
-        audio_file.close()
+        logger.info("WebSocket connection closing, starting cleanup...")
+        if audio_file:
+            audio_file.close()
+            logger.info("Audio file closed successfully")
+            
+            # Transcribe the audio file if it exists
+            if filename and os.path.exists(filename):
+                logger.info(f"Audio file exists, starting transcription: {filename}")
+                await handle_transcription(filename)
+            else:
+                logger.error(f"Audio file not found: {filename}")
         
         if not is_closed:
             try:
@@ -68,17 +104,17 @@ async def websocket_endpoint(websocket: WebSocket):
 async def event_websocket_endpoint(websocket: WebSocket):
     handler = EventWebSocketHandler(websocket)
     
-    # Register event handlers
-    @handler.on("USER_PROMPT_RESPONSE")
-    async def handle_user_prompt_response(payload):
-        logger.info(f"Received user prompt response: {payload}")
-        # Process the response and emit a confirmation
-        await handler.emit("PROMPT_RESPONSE_RECEIVED", {
-            "status": "success",
-            "message": "Response received and processed"
-        })
+    # Generate a unique ID for this connection
+    connection_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    active_event_handlers[connection_id] = handler
+    logger.info(f"New event handler registered with ID: {connection_id}")
     
-    await handler.handle_connection()
+    try:
+        await handler.handle_connection()
+    finally:
+        # Remove the handler when the connection is closed
+        active_event_handlers.pop(connection_id, None)
+        logger.info(f"Event handler removed: {connection_id}")
 
 if __name__ == "__main__":
     import uvicorn

@@ -7,8 +7,13 @@ interface EventMessage {
   timestamp: string;
 }
 
+interface TranscriptionResponse {
+  text: string;
+}
+
 export default class EventService extends Service {
   @tracked isConnected = false;
+  @tracked lastTranscription: string | null = null;
   private ws: WebSocket | null = null;
   private eventHandlers: Map<string, Set<(payload: any) => void>> = new Map();
   private reconnectAttempts = 0;
@@ -47,6 +52,14 @@ export default class EventService extends Service {
         console.error('Error parsing WebSocket message:', error);
       }
     };
+
+    // Register default handler for transcription responses
+    this.on('prompt_response', this.handleTranscriptionResponse.bind(this));
+  }
+
+  private handleTranscriptionResponse(payload: TranscriptionResponse) {
+    this.lastTranscription = payload.text;
+    console.log('Received transcription:', payload.text);
   }
 
   private attemptReconnect() {
