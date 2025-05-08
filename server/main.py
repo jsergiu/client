@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 from utils.logger import setup_logging
 from websocket.event_handler import EventWebSocketHandler
-from speech.recognition.whisper_stt import WhisperSTT
+from server.speech.recognition.whisper_asr import WhisperASR
 
 logger = setup_logging()
 logger.info("Application starting")
@@ -23,29 +23,11 @@ app.add_middleware(
 # Create audio directory if it doesn't exist
 os.makedirs("audio", exist_ok=True)
 
-# Initialize WhisperSTT
-whisper_stt = WhisperSTT()
-
 # Store active event handlers
 active_event_handlers: dict[str, EventWebSocketHandler] = {}
 
-async def handle_transcription(filename: str) -> None:
-    """Handle the transcription of an audio file and send it to all connected clients."""
-    try:
-        logger.info(f"Starting transcription of file: {filename}")
-        transcription = whisper_stt.transcribe(filename)
-        if transcription:  # Check if transcription was successful
-            logger.info(f"Transcription successful: {transcription[:100]}...")
-            # Send transcription through event WebSocket
-            for handler in active_event_handlers.values():
-                await handler.emit("prompt_response", {
-                    "text": transcription
-                })
-            logger.info("Transcription sent to all connected clients")
-        else:
-            logger.error("Transcription returned None")
-    except Exception as e:
-        logger.error(f"Error transcribing audio: {str(e)}")
+# Initialize WhisperASR with event handlers
+whisper_stt = WhisperASR(event_handlers=active_event_handlers)
 
 @app.websocket("/ws/audio")
 async def websocket_endpoint(websocket: WebSocket):
@@ -88,7 +70,7 @@ async def websocket_endpoint(websocket: WebSocket):
             # Transcribe the audio file if it exists
             if filename and os.path.exists(filename):
                 logger.info(f"Audio file exists, starting transcription: {filename}")
-                await handle_transcription(filename)
+                await whisper_stt.transcribe(filename)
             else:
                 logger.error(f"Audio file not found: {filename}")
         
