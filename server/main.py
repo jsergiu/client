@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 from utils.logger import setup_logging
 from websocket.event_handler import EventWebSocketHandler
-from server.speech.recognition.whisper_asr import WhisperASR
+from speech.recognition.whisper_asr import WhisperASR
 
 logger = setup_logging()
 logger.info("Application starting")
